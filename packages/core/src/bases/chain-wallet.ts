@@ -1,45 +1,46 @@
 /* eslint-disable no-console */
 import {
+  CosmWasmClient,
   SigningCosmWasmClient,
   SigningCosmWasmClientOptions,
 } from '@cosmjs/cosmwasm-stargate';
-import { OfflineSigner } from '@cosmjs/proto-signing';
+import { EncodeObject, OfflineSigner } from '@cosmjs/proto-signing';
 import {
+  calculateFee,
+  GasPrice,
   SigningStargateClient,
   SigningStargateClientOptions,
+  StargateClient,
+  StargateClientOptions,
+  StdFee,
 } from '@cosmjs/stargate';
+import { TxRaw } from 'cosmjs-types/cosmos/tx/v1beta1/tx';
 
-import { ChainInfo, ChainWalletDataBase, State, Wallet } from '../types';
-import { StateBase } from './state';
-
-export abstract class ChainWalletBase<
+import {
+  Callbacks,
+  ChainRecord,
+  ChainWalletData,
+  SessionOptions,
+  State,
+  Wallet,
+  WalletAccount,
   WalletClient,
-  ChainWalletData extends ChainWalletDataBase,
-  MainWallet extends { walletInfo: Wallet }
-> extends StateBase<ChainWalletData> {
-  protected _chainInfo: ChainInfo;
-  protected mainWallet: MainWallet;
-  rpcEndpoints: string[];
-  restEndpoints: string[];
+} from '../types';
+import { isValidEndpoint } from '../utils';
+import { WalletBase } from './wallet';
 
-  constructor(_chainInfo: ChainInfo, mainWallet: MainWallet) {
-    super();
-    this._chainInfo = _chainInfo;
-    this.mainWallet = mainWallet;
-    this.rpcEndpoints = [
-      ...(_chainInfo.preferredEndpoints?.rpc || []),
-      `https://rpc.cosmos.directory/${this.chainName}`,
-      ...(_chainInfo.chain?.apis?.rpc?.map((e) => e.address) || []),
-    ];
-    this.restEndpoints = [
-      ...(_chainInfo.preferredEndpoints?.rest || []),
-      `https://rest.cosmos.directory/${this.chainName}`,
-      ...(_chainInfo.chain?.apis?.rest?.map((e) => e.address) || []),
-    ];
-  }
+export class ChainWalletBase extends WalletBase<ChainWalletData> {
+  protected _chainInfo: ChainRecord;
+  rpcEndpoints?: string[];
+  restEndpoints?: string[];
+  protected _rpcEndpoint?: string;
+  protected _restEndpoint?: string;
 
-  get walletInfo() {
-    return this.mainWallet.walletInfo;
+  constructor(walletInfo: Wallet, chainInfo: ChainRecord) {
+    super(walletInfo);
+    this._chainInfo = chainInfo;
+    this.rpcEndpoints = chainInfo.preferredEndpoints?.rpc;
+    this.restEndpoints = chainInfo.preferredEndpoints?.rest;
   }
 
   get chainInfo() {
@@ -50,12 +51,19 @@ export abstract class ChainWalletBase<
     return this.chainInfo.name;
   }
 
-  get stargateOptions(): SigningStargateClientOptions | undefined {
-    return this.chainInfo.signerOptions?.stargate;
+  get stargateOptions(): StargateClientOptions | undefined {
+    return this.chainInfo.clientOptions?.stargate;
   }
 
-  get cosmwasmOptions(): SigningCosmWasmClientOptions | undefined {
-    return this.chainInfo.signerOptions?.cosmwasm;
+  get signingStargateOptions(): SigningStargateClientOptions | undefined {
+    return (
+      this.chainInfo.clientOptions?.signingStargate ||
+      this.chainInfo.clientOptions?.stargate
+    );
+  }
+
+  get signingCosmwasmOptions(): SigningCosmWasmClientOptions | undefined {
+    return this.chainInfo.clientOptions?.signingCosmwasm;
   }
 
   get chain() {
@@ -63,7 +71,7 @@ export abstract class ChainWalletBase<
   }
 
   get assets() {
-    return this.chainInfo.assetList.assets;
+    return this.chainInfo.assetList?.assets;
   }
 
   get assetList() {
@@ -78,33 +86,9 @@ export abstract class ChainWalletBase<
     return this.chain?.codebase?.cosmwasm_enabled;
   }
 
-  getRpcEndpoint = async (): Promise<string | undefined> => {
-    for (const endpoint of this.rpcEndpoints) {
-      try {
-        const response = await fetch(endpoint);
-        if (response.status == 200) {
-          return endpoint;
-        }
-      } catch (err) {
-        console.error(`Failed to fetch RPC ${endpoint}`);
-      }
-    }
-    return undefined;
-  };
-
-  getRestEndpoint = async (): Promise<string | undefined> => {
-    for (const endpoint of this.restEndpoints) {
-      try {
-        const response = await fetch(endpoint);
-        if (response.status == 200) {
-          return endpoint;
-        }
-      } catch (err) {
-        console.error(`Failed to fetch REST ${endpoint}`);
-      }
-    }
-    return undefined;
-  };
+  get username(): string | undefined {
+    return this.data?.username;
+  }
 
   get address(): string | undefined {
     return this.data?.address;
@@ -114,49 +98,238 @@ export abstract class ChainWalletBase<
     return this.data?.offlineSigner;
   }
 
-  disconnect() {
-    this.reset();
+  fetchClient(): WalletClient | Promise<WalletClient | undefined> | undefined {
+    console.warn(
+      'This method should keep the same with the main walllet. If you see this message, please check your "onSetChainsDone" method in main wallet.'
+    );
+    return void 0;
   }
 
-  async connect() {
-    if (!(await this.client)) {
-      this.setState(State.Error);
-      this.setMessage('Client Not Exist!');
+  async update(sessionOptions?: SessionOptions, callbacks?: Callbacks) {
+    if (!this.client) {
+      this.setClientNotExist();
       return;
     }
-    await this.update();
+
+    this.setState(State.Pending);
+    try {
+      let account: WalletAccount;
+      if (this.client.addChain) {
+        try {
+          account = await this.client.getAccount(this.chainId);
+        } catch (error) {
+          await this.client.addChain(this.chainInfo);
+          account = await this.client.getAccount(this.chainId);
+        }
+      } else {
+        account = await this.client.getAccount(this.chainId);
+      }
+
+      this.setData({
+        address: account.address,
+        username: account.name,
+        offlineSigner: this.chainId
+          ? await this.client.getOfflineSigner(this.chainId)
+          : void 0,
+      });
+      this.setState(State.Done);
+
+      if (sessionOptions?.duration) {
+        setTimeout(() => {
+          this.disconnect(callbacks);
+        }, sessionOptions?.duration);
+      }
+    } catch (e) {
+      if (this.rejectMatched(e as Error)) {
+        this.setRejected();
+      } else {
+        this.setError(e as Error);
+      }
+    }
+    callbacks?.connect?.();
   }
 
-  getStargateClient = async (): Promise<SigningStargateClient | undefined> => {
+  getRpcEndpoint = async (): Promise<string | undefined> => {
+    if (this._rpcEndpoint && (await isValidEndpoint(this._rpcEndpoint))) {
+      return this._rpcEndpoint;
+    }
+    for (const endpoint of this.rpcEndpoints || []) {
+      if (await isValidEndpoint(endpoint)) {
+        this._rpcEndpoint = endpoint;
+        return endpoint;
+      }
+    }
+    console.warn(`No valid RPC endpoint available!`);
+    return void 0;
+  };
+
+  getRestEndpoint = async (): Promise<string | undefined> => {
+    if (this._restEndpoint && (await isValidEndpoint(this._restEndpoint))) {
+      return this._restEndpoint;
+    }
+    for (const endpoint of this.restEndpoints || []) {
+      if (await isValidEndpoint(endpoint)) {
+        this._restEndpoint = endpoint;
+        return endpoint;
+      }
+    }
+    console.warn(`No valid Rest endpoint available!`);
+    return void 0;
+  };
+
+  getStargateClient = async (): Promise<StargateClient | undefined> => {
     const rpcEndpoint = await this.getRpcEndpoint();
+
+    if (this.offlineSigner && rpcEndpoint) {
+      console.info('Using RPC endpoint ' + rpcEndpoint);
+      return StargateClient.connect(rpcEndpoint, this.stargateOptions);
+    }
+    console.error('Undefined offlineSigner or rpcEndpoint.');
+    return void 0;
+  };
+
+  getCosmWasmClient = async (): Promise<CosmWasmClient | undefined> => {
+    const rpcEndpoint = await this.getRpcEndpoint();
+
+    if (this.offlineSigner && rpcEndpoint) {
+      console.info('Using RPC endpoint ' + rpcEndpoint);
+      return CosmWasmClient.connect(rpcEndpoint);
+    }
+    console.error('Undefined offlineSigner or rpcEndpoint.');
+    return void 0;
+  };
+
+  getSigningStargateClient = async (): Promise<SigningStargateClient> => {
+    const rpcEndpoint = await this.getRpcEndpoint();
+
     if (this.offlineSigner && rpcEndpoint) {
       console.info('Using RPC endpoint ' + rpcEndpoint);
       return SigningStargateClient.connectWithSigner(
         rpcEndpoint,
         this.offlineSigner,
-        this.stargateOptions
+        this.signingStargateOptions
       );
+    } else {
+      throw new Error('Undefined offlineSigner or rpcEndpoint.');
     }
-    console.error('Undefined offlineSigner or rpcEndpoint.');
-    return undefined;
   };
 
-  getCosmWasmClient = async (): Promise<SigningCosmWasmClient | undefined> => {
+  getSigningCosmWasmClient = async (): Promise<SigningCosmWasmClient> => {
     const rpcEndpoint = await this.getRpcEndpoint();
+
     if (this.offlineSigner && rpcEndpoint) {
       console.info('Using RPC endpoint ' + rpcEndpoint);
       return SigningCosmWasmClient.connectWithSigner(
         rpcEndpoint,
         this.offlineSigner,
-        this.cosmwasmOptions
+        this.signingCosmwasmOptions
       );
+    } else {
+      throw new Error('Undefined offlineSigner or rpcEndpoint.');
     }
-    console.error('Undefined offlineSigner or rpcEndpoint.');
-    return undefined;
   };
 
-  abstract get client():
-    | Promise<WalletClient | undefined>
-    | undefined
-    | WalletClient;
+  protected getSigningClient = async (type?: string) => {
+    switch (type) {
+      case 'stargate':
+        return await this.getSigningStargateClient();
+      case 'cosmwasm':
+        return await this.getSigningCosmWasmClient();
+      default:
+        return this.getSigningStargateClient();
+    }
+  };
+
+  estimateFee = async (
+    messages: EncodeObject[],
+    type?: string,
+    memo?: string,
+    multiplier?: number
+  ) => {
+    if (!this.address) {
+      throw new Error(
+        'Address is required to estimate fee. Try connect to fetch address.'
+      );
+    }
+
+    let gasPrice: GasPrice | undefined;
+    switch (type) {
+      case 'stargate':
+        gasPrice = this.signingStargateOptions?.gasPrice;
+        break;
+      case 'cosmwasm':
+        gasPrice = this.signingCosmwasmOptions?.gasPrice;
+        break;
+      default:
+        gasPrice = this.signingStargateOptions?.gasPrice;
+        break;
+    }
+
+    if (!gasPrice) {
+      throw new Error(
+        'Gas price must be set in the client options when auto gas is used.'
+      );
+    }
+    const client = await this.getSigningClient(type);
+    const gasEstimation = await client.simulate(this.address, messages, memo);
+    return calculateFee(
+      Math.round(gasEstimation * (multiplier || 1.3)),
+      gasPrice
+    );
+  };
+
+  sign = async (
+    messages: EncodeObject[],
+    fee?: StdFee | number,
+    memo?: string,
+    type?: string
+  ): Promise<TxRaw> => {
+    if (!this.address) {
+      throw new Error(
+        'Address is required to estimate fee. Try connect to fetch address.'
+      );
+    }
+    const client = await this.getSigningClient(type);
+    let usedFee: StdFee;
+    if (typeof fee === 'undefined' || typeof fee === 'number') {
+      usedFee = await this.estimateFee(messages, type, memo, fee);
+    } else {
+      usedFee = fee;
+    }
+
+    return await client.sign(this.address, messages, usedFee, memo || '');
+  };
+
+  broadcast = async (signedMessages: TxRaw, type?: string) => {
+    const client = await this.getSigningClient(type);
+    const txBytes = TxRaw.encode(signedMessages).finish();
+
+    let timeoutMs: number | undefined, pollIntervalMs: number | undefined;
+    switch (type) {
+      case 'stargate':
+        timeoutMs = this.signingStargateOptions?.broadcastTimeoutMs;
+        pollIntervalMs = this.signingStargateOptions?.broadcastPollIntervalMs;
+        break;
+      case 'cosmwasm':
+        timeoutMs = this.signingCosmwasmOptions?.broadcastTimeoutMs;
+        pollIntervalMs = this.signingCosmwasmOptions?.broadcastPollIntervalMs;
+        break;
+      default:
+        timeoutMs = this.signingStargateOptions?.broadcastTimeoutMs;
+        pollIntervalMs = this.signingStargateOptions?.broadcastPollIntervalMs;
+        break;
+    }
+
+    return client.broadcastTx(txBytes, timeoutMs, pollIntervalMs);
+  };
+
+  signAndBroadcast = async (
+    messages: EncodeObject[],
+    fee?: StdFee | number,
+    memo?: string,
+    type?: string
+  ) => {
+    const signedMessages = await this.sign(messages, fee, memo, type);
+    return this.broadcast(signedMessages, type);
+  };
 }

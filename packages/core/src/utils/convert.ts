@@ -1,13 +1,13 @@
 import { AssetList, Chain } from '@chain-registry/types';
 
-import { ChainInfo, Endpoints, SignerOptions } from '../types';
+import { ChainRecord, Endpoints, SignerOptions } from '../types';
 
 export function convertChain(
   chain: Chain,
   assetLists: AssetList[],
   signerOptions?: SignerOptions,
   preferredEndpoints?: Endpoints
-): ChainInfo {
+): ChainRecord {
   const assetList = assetLists.find(
     (list) => list.chain_name === chain.chain_name
   );
@@ -15,9 +15,10 @@ export function convertChain(
     name: chain.chain_name,
     chain,
     assetList,
-    signerOptions: {
+    clientOptions: {
       stargate: signerOptions?.stargate?.(chain),
-      cosmwasm: signerOptions?.cosmwasm?.(chain),
+      signingStargate: signerOptions?.signingStargate?.(chain),
+      signingCosmwasm: signerOptions?.signingCosmwasm?.(chain),
     },
     preferredEndpoints,
   };

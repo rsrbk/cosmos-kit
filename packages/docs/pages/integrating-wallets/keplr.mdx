@@ -1,0 +1,41 @@
+import { WalletSection } from "../../components";
+import { walletNames } from "@cosmos-kit/keplr";
+
+# How to Add Keplr wallet to Cosmos Kit
+
+## add `@cosmoskit/keplr`
+
+```
+yarn add @cosmoskit/keplr
+```
+
+## import the wallets
+
+```js
+import { wallets as keplrWallets } from '@cosmos-kit/keplr';
+```
+
+## add to your provider
+
+```js
+function MyCosmosApp({ Component, pageProps }: AppProps) {
+  return (
+    <ChakraProvider theme={defaultTheme}>
+      <WalletProvider
+        chains={chains}
+        assetLists={assets}
+        wallets={[...keplrWallets]}
+      >
+        <Component {...pageProps} />
+      </WalletProvider>
+    </ChakraProvider>
+  );
+}
+
+export default MyCosmosApp;
+```
+
+## try it out!
+
+<WalletSection walletNames={walletNames}/>
+

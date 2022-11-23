@@ -1,0 +1,60 @@
+{
+  "name": "docs",
+  "version": "1.5.1",
+  "private": true,
+  "main": "index.js",
+  "license": "MIT",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "debug": "NODE_OPTIONS='--inspect' next dev",
+    "vercel-build": "yarn workspace nextra run build && yarn workspace nextra-theme-docs run build && yarn build",
+    "clean": "rimraf .next .turbo",
+    "export": "next build && next export",
+    "postexport": "npm run seo",
+    "seo": "node ./seo/seo.js",
+    "deploy": "AWS_PROFILE=webinc aws s3 sync out/ s3://docs.cosmoskit.com",
+    "invalidate": "AWS_PROFILE=webinc aws cloudfront create-invalidation --distribution-id EN5Y85FX893DG --paths \"/*\"",
+    "deploy:all": "npm run export && npm run deploy && ./seo/prepare.sh"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "^2.2.9",
+    "@cosmos-kit/core": "^0.26.1",
+    "@cosmos-kit/cosmostation": "^0.12.1",
+    "@cosmos-kit/keplr": "^0.30.1",
+    "@cosmos-kit/leap": "^0.11.1",
+    "@cosmos-kit/react": "^0.25.1",
+    "@emotion/react": "^11",
+    "@emotion/styled": "^11",
+    "chain-registry": "^1.4.0",
+    "next": "12.3.1",
+    "nextra": "2.0.0-beta.33",
+    "nextra-theme-docs": "2.0.0-beta.33",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-icons": "^4.4.0"
+  },
+  "devDependencies": {
+    "@babel/plugin-syntax-bigint": "7.8.3",
+    "@babel/preset-env": "7.19.1",
+    "@babel/preset-react": "7.18.6",
+    "@babel/preset-typescript": "7.18.6",
+    "@types/node": "18.7.18",
+    "@types/react": "18.0.20",
+    "@types/react-dom": "18.0.6",
+    "babel-loader": "8.2.5",
+    "eslint": "8.23.1",
+    "eslint-config-next": "12.3.1",
+    "ts-loader": "9.4.1",
+    "typescript": "4.8.3"
+  },
+  "dependenciesMeta": {
+    "nextra": {
+      "injected": true
+    },
+    "nextra-theme-docs": {
+      "injected": true
+    }
+  }
+}

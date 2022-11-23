@@ -1,8 +1,13 @@
-import { Mutable, State, StateActions, WalletStatus } from '../types';
-export declare abstract class StateBase<T> {
+import { Actions, AppEnv, Mutable, State, StateActions, WalletStatus } from '../types';
+export declare class StateBase<T> {
     protected _mutable: Mutable<T>;
     actions?: StateActions<T>;
+    protected _env?: AppEnv;
     constructor();
+    get env(): AppEnv;
+    setEnv(env?: AppEnv): void;
+    setActions: (actions: Actions) => void;
+    get isMobile(): boolean;
     get emitState(): import("../types").Dispatch<State>;
     get emitData(): import("../types").Dispatch<T>;
     get emitMessage(): import("../types").Dispatch<string>;
@@ -19,10 +24,10 @@ export declare abstract class StateBase<T> {
     setMessage(message: string | undefined): void;
     reset(): void;
     get walletStatus(): WalletStatus;
+    get isWalletConnecting(): boolean;
     get isWalletConnected(): boolean;
     get isWalletDisconnected(): boolean;
     get isWalletRejected(): boolean;
     get isWalletNotExist(): boolean;
     get isWalletError(): boolean;
-    abstract update(): void | Promise<void>;
 }

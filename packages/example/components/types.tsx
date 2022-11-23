@@ -1,5 +1,10 @@
-import { MouseEventHandler, ReactNode, RefObject } from "react";
-import { IconType } from "react-icons";
+import { MouseEventHandler, ReactNode, RefObject } from 'react';
+import { IconType } from 'react-icons';
+
+export interface ChainCardProps {
+  prettyName: string;
+  icon?: string;
+}
 
 export interface ConnectWalletType {
   buttonText?: string;
@@ -62,3 +67,12 @@ export interface ChangeChainMenuType {
   onChange: handleSelectChainDropdown;
   innerRef?: RefObject<HTMLInputElement>;
 }
+
+export type CopyAddressType = {
+  address?: string;
+  walletIcon?: string;
+  isLoading?: boolean;
+  maxDisplayLength?: number;
+  isRound?: boolean;
+  size?: string;
+};

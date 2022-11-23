@@ -3,13 +3,15 @@ import { AssetList, Chain } from '@chain-registry/types';
 import {
   ChainName,
   EndpointOptions,
+  MainWalletBase,
   MainWalletData,
+  ModalVersion,
+  SessionOptions,
   SignerOptions,
   StorageOptions,
   ViewOptions,
   WalletManager,
   WalletName,
-  WalletOption,
 } from '@cosmos-kit/core';
 import { WalletModalProps } from '@cosmos-kit/core';
 import React, {
@@ -20,7 +22,7 @@ import React, {
   useState,
 } from 'react';
 
-import { DefaultModal } from './modal';
+import { getModalFromVersion } from './modal';
 
 export const walletContext = createContext<{
   walletManager: WalletManager;
@@ -35,16 +37,20 @@ export const WalletProvider = ({
   viewOptions,
   endpointOptions,
   storageOptions,
+  sessionOptions,
   children,
 }: {
   chains: Chain[];
   assetLists: AssetList[];
-  wallets: WalletOption[];
-  walletModal?: ({ isOpen, setOpen }: WalletModalProps) => JSX.Element;
+  wallets: MainWalletBase[];
+  walletModal?:
+    | ModalVersion
+    | (({ isOpen, setOpen }: WalletModalProps) => JSX.Element);
   signerOptions?: SignerOptions;
   viewOptions?: ViewOptions;
   endpointOptions?: EndpointOptions;
   storageOptions?: StorageOptions;
+  sessionOptions?: SessionOptions;
   children: ReactNode;
 }) => {
   const walletManager = useMemo(
@@ -56,10 +62,25 @@ export const WalletProvider = ({
         signerOptions,
         viewOptions,
         endpointOptions,
-        storageOptions
+        storageOptions,
+        sessionOptions
       ),
     []
   );
+
+  // const walletManagerV2 = useMemo(
+  //   () =>
+  //     new WalletManagerV2(
+  //       chains,
+  //       assetLists,
+  //       wallets,
+  //       signerOptions,
+  //       viewOptions,
+  //       endpointOptions,
+  //       sessionOptions
+  //     ),
+  //   []
+  // );
 
   const [walletData, setWalletData] = useState<MainWalletData>();
   const [walletState, setWalletState] = useState(walletManager.state);
@@ -70,7 +91,7 @@ export const WalletProvider = ({
 
   const [isViewOpen, setViewOpen] = useState<boolean>(false);
   const [chainName, setChainName] = useState<ChainName | undefined>();
-  const [qrUri, setQRUri] = useState<string | undefined>();
+  const [qrUrl, setQRUrl] = useState<string | undefined>();
 
   walletManager.setActions({
     data: setWalletData,
@@ -79,36 +100,24 @@ export const WalletProvider = ({
     walletName: setWalletName,
     viewOpen: setViewOpen,
     chainName: setChainName,
-    qrUri: setQRUri,
+    qrUrl: setQRUrl,
   });
 
-  const Modal = walletModal || DefaultModal;
+  const Modal = useMemo(() => {
+    if (!walletModal) {
+      return getModalFromVersion('simple_v2');
+    } else if (typeof walletModal === 'string') {
+      return getModalFromVersion(walletModal as ModalVersion);
+    } else {
+      return walletModal;
+    }
+  }, [walletModal]);
 
   useEffect(() => {
-    if (walletManager.useStorage) {
-      const storeStr = window.localStorage.getItem('walletManager');
-      if (storeStr) {
-        const { currentWalletName, currentChainName } = JSON.parse(storeStr);
-        walletManager.setCurrentWallet(currentWalletName);
-        walletManager.setCurrentChain(currentChainName);
-        if (currentWalletName) {
-          walletManager.connect();
-        }
-      }
-
-      const handleTabClose = (event) => {
-        event.preventDefault();
-        if (walletManager.storageOptions.clearOnTabClose) {
-          window.localStorage.removeItem('walletManager');
-        }
-      };
-
-      window.addEventListener('beforeunload', handleTabClose);
-
-      return () => {
-        window.removeEventListener('beforeunload', handleTabClose);
-      };
-    }
+    walletManager.onMounted();
+    return () => {
+      walletManager.onUnmounted();
+    };
   }, []);
 
   return (

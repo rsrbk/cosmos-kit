@@ -1,8 +1,8 @@
-import { ChainWalletDataBase, MainWalletDataBase } from '@cosmos-kit/core';
-export interface ChainKeplrMobileData extends ChainWalletDataBase {
-    username?: string;
-    qrUri?: string;
-}
-export interface KeplrMobileData extends MainWalletDataBase {
-    qrUri?: string;
+export interface KeplrAccount {
+    address: string;
+    algo: string;
+    bech32Address: string;
+    isNanoLedger: boolean;
+    name: string;
+    pubKey: string;
 }

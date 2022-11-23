@@ -1,12 +1,36 @@
-import { Mutable, State, StateActions, WalletStatus } from '../types';
+import {
+  Actions,
+  AppEnv,
+  Mutable,
+  State,
+  StateActions,
+  WalletStatus,
+} from '../types';
 import { getWalletStatusFromState } from '../utils';
 
-export abstract class StateBase<T> {
+export class StateBase<T> {
   protected _mutable: Mutable<T>;
   actions?: StateActions<T>;
+  protected _env?: AppEnv;
 
   constructor() {
     this._mutable = { state: State.Init };
+  }
+
+  get env() {
+    return this._env;
+  }
+
+  setEnv(env?: AppEnv) {
+    this._env = env;
+  }
+
+  setActions = (actions: Actions) => {
+    this.actions = actions;
+  };
+
+  get isMobile() {
+    return this.env?.device === 'mobile';
   }
 
   get emitState() {
@@ -78,6 +102,10 @@ export abstract class StateBase<T> {
     return getWalletStatusFromState(this.state, this.message);
   }
 
+  get isWalletConnecting() {
+    return this.walletStatus === WalletStatus.Connecting;
+  }
+
   get isWalletConnected() {
     return this.walletStatus === WalletStatus.Connected;
   }
@@ -97,6 +125,4 @@ export abstract class StateBase<T> {
   get isWalletError() {
     return this.walletStatus === WalletStatus.Error;
   }
-
-  abstract update(): void | Promise<void>;
 }

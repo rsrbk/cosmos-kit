@@ -1,0 +1,79 @@
+# How to use Cosmos Kit
+
+> 💡 Make sure you are using `React18`
+
+## Quickstart
+
+🏁 Get started quickly by using [create-cosmos-app](https://github.com/cosmology-tech/create-cosmos-app) to help you build high-quality Cosmos apps fast!
+
+## Use Cosmos Kit from Scratch
+
+### 1️⃣ Install Dependencies
+
+```sh
+yarn add @cosmos-kit/react @cosmos-kit/core @cosmos-kit/keplr chain-registry
+```
+
+### 2️⃣ Wrap Provider
+
+First, add the `WalletProvider` to your app, and include the supported chains and supported wallets:
+
+```tsx
+import * as React from 'react';
+
+import { ChakraProvider } from '@chakra-ui/react';
+import { WalletProvider } from '@cosmos-kit/react';
+import { chains, assets } from 'chain-registry';
+import { wallets } from '@cosmos-kit/keplr';
+
+function CosmosApp() {
+  return (
+    <ChakraProvider theme={defaultTheme}>
+      <WalletProvider
+        chains={chains} // supported chains
+        assetLists={assets} // supported asset lists
+        wallets={wallets} // supported wallets
+      >
+        <YourWalletRelatedComponents />
+      </WalletProvider>
+    </ChakraProvider>
+  );
+}
+```
+
+### 3️⃣ Consume with Hook
+
+Consume `WalletProvider` with the `useWallet` hook. It returns `WalletMananger` object, which provides wallet properties and functions.
+
+```tsx
+import * as React from 'react';
+
+import { useWallet } from "@cosmos-kit/react";
+
+function Component ({ chainName }: { chainName?: string }) => {
+    const walletManager = useWallet();
+
+    // Get wallet properties
+    const {
+      currentChainName,
+      currentWalletName,
+      walletStatus,
+      username,
+      address,
+      message,
+    } = walletManager;
+
+    // Get wallet functions
+    const {
+        connect,
+        disconnect,
+        openView,
+        setCurrentChain,
+    } = walletManager;
+
+    // if `chainName` in component props, `setCurrentChain` in `useEffect`
+    React.useEffect(() => {
+        setCurrentChain(chainName);
+    }, [chainName]);
+}
+```

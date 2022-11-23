@@ -1,7 +1,8 @@
 import { State, WalletStatus } from '../types';
+import { ClientNotExistError, RejectedError } from './error';
 
 export const getWalletStatusFromState = (
-  state?: State,
+  state: State,
   message?: string
 ): WalletStatus => {
   switch (state) {
@@ -11,9 +12,9 @@ export const getWalletStatusFromState = (
       return WalletStatus.Connected;
     case State.Error:
       switch (message) {
-        case 'Client Not Exist!':
+        case ClientNotExistError.message:
           return WalletStatus.NotExist;
-        case 'Request rejected':
+        case RejectedError.message:
           return WalletStatus.Rejected;
         default:
           return WalletStatus.Error;

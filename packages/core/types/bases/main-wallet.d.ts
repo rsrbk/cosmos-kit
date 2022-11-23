@@ -1,23 +1,16 @@
-import { ChainInfo, ChainName, Wallet } from '../types';
-import { ChainWalletDataBase, MainWalletDataBase } from '../types';
+import { Callbacks, ChainName, ChainRecord, EndpointOptions, IChainWallet, MainWalletData, SessionOptions, Wallet } from '../types';
 import { ChainWalletBase } from './chain-wallet';
-import { StateBase } from './state';
-export declare abstract class MainWalletBase<WalletClient, MainWalletData extends MainWalletDataBase, ChainWalletData extends ChainWalletDataBase, ChainWallet extends ChainWalletBase<WalletClient, ChainWalletData, any>> extends StateBase<MainWalletData> {
-    protected abstract _chains: Map<ChainName, ChainWallet>;
-    protected abstract _client: Promise<WalletClient | undefined> | WalletClient | undefined;
-    protected _chainsInfo: ChainInfo[];
-    protected _walletInfo: Wallet;
-    constructor(_walletInfo: Wallet, _chainsInfo?: ChainInfo[]);
-    get client(): WalletClient | Promise<WalletClient>;
-    get walletInfo(): Wallet;
-    get walletName(): string;
+import { WalletBase } from './wallet';
+export declare abstract class MainWalletBase extends WalletBase<MainWalletData> {
+    protected _chainWallets?: Map<ChainName, ChainWalletBase>;
+    preferredEndpoints?: EndpointOptions;
+    ChainWallet: IChainWallet;
+    constructor(walletInfo: Wallet, ChainWallet: IChainWallet);
+    protected onSetChainsDone(): void;
+    setChains(chains: ChainRecord[]): void;
     get username(): string | undefined;
-    get chains(): Map<string, ChainWallet>;
-    get count(): number;
-    get chainNames(): ChainName[];
-    get chainList(): ChainWallet[];
-    getChain(chainName: string): ChainWallet;
-    disconnect(): void;
-    connect(): Promise<void>;
-    abstract setChains(supportedChains?: ChainInfo[]): void;
+    get chainWallets(): Map<string, ChainWalletBase>;
+    getChainWallet(chainName: string): ChainWalletBase | undefined;
+    update(sessionOptions?: SessionOptions, callbacks?: Callbacks): Promise<void>;
+    disconnect(callbacks?: Callbacks): void;
 }

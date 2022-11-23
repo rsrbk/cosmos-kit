@@ -1,87 +1,94 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { ChainInfo, ChainName, State, Wallet } from '../types';
-import { ChainWalletDataBase, MainWalletDataBase } from '../types';
+import {
+  Callbacks,
+  ChainName,
+  ChainRecord,
+  EndpointOptions,
+  IChainWallet,
+  MainWalletData,
+  SessionOptions,
+  State,
+  Wallet,
+} from '../types';
 import { ChainWalletBase } from './chain-wallet';
-import { StateBase } from './state';
+import { WalletBase } from './wallet';
 
-export abstract class MainWalletBase<
-  WalletClient,
-  MainWalletData extends MainWalletDataBase,
-  ChainWalletData extends ChainWalletDataBase,
-  ChainWallet extends ChainWalletBase<WalletClient, ChainWalletData, any>
-> extends StateBase<MainWalletData> {
-  protected abstract _chains: Map<ChainName, ChainWallet>;
-  protected abstract _client:
-    | Promise<WalletClient | undefined>
-    | WalletClient
-    | undefined;
+export abstract class MainWalletBase extends WalletBase<MainWalletData> {
+  protected _chainWallets?: Map<ChainName, ChainWalletBase>;
+  preferredEndpoints?: EndpointOptions;
+  ChainWallet: IChainWallet;
 
-  protected _chainsInfo: ChainInfo[] = [];
-  protected _walletInfo: Wallet;
-
-  constructor(_walletInfo: Wallet, _chainsInfo?: ChainInfo[]) {
-    super();
-    this._walletInfo = _walletInfo;
-    this._chainsInfo = _chainsInfo;
-    if (_chainsInfo) {
-      this.setChains(_chainsInfo);
-    }
+  constructor(walletInfo: Wallet, ChainWallet: IChainWallet) {
+    super(walletInfo);
+    this.ChainWallet = ChainWallet;
+    this.clientPromise = this.fetchClient();
   }
 
-  get client() {
-    return this._client;
+  protected onSetChainsDone(): void {
+    this.chainWallets?.forEach((chainWallet) => {
+      chainWallet.client = this.client;
+      chainWallet.clientPromise = this.clientPromise;
+      chainWallet.fetchClient = this.fetchClient;
+    });
   }
 
-  get walletInfo(): Wallet {
-    return this._walletInfo;
-  }
+  setChains(chains: ChainRecord[]): void {
+    this._chainWallets = new Map(
+      chains.map((chain) => {
+        chain.preferredEndpoints = {
+          rpc: [
+            ...(chain.preferredEndpoints?.rpc || []),
+            ...(this.preferredEndpoints?.[chain.name]?.rpc || []),
+            `https://rpc.cosmos.directory/${chain.name}`,
+            ...(chain.chain?.apis?.rpc?.map((e) => e.address) || []),
+          ],
+          rest: [
+            ...(chain.preferredEndpoints?.rest || []),
+            ...(this.preferredEndpoints?.[chain.name]?.rest || []),
+            `https://rest.cosmos.directory/${chain.name}`,
+            ...(chain.chain?.apis?.rest?.map((e) => e.address) || []),
+          ],
+        };
 
-  get walletName() {
-    return this.walletInfo.name;
+        return [chain.name, new this.ChainWallet(this.walletInfo, chain)];
+      })
+    );
+
+    this.onSetChainsDone();
   }
 
   get username(): string | undefined {
     return this.data?.username;
   }
 
-  get chains() {
-    return this._chains;
+  get chainWallets() {
+    return this._chainWallets;
   }
 
-  get count() {
-    return this.chains.size;
+  getChainWallet(chainName: string): ChainWalletBase | undefined {
+    return this.chainWallets?.get(chainName);
   }
 
-  get chainNames(): ChainName[] {
-    return Array.from(this.chains.keys());
-  }
-
-  get chainList(): ChainWallet[] {
-    return Array.from(this.chains.values());
-  }
-
-  getChain(chainName: string): ChainWallet {
-    if (!this.chains.has(chainName)) {
-      throw new Error(`Unknown chain name: ${chainName}`);
+  async update(sessionOptions?: SessionOptions, callbacks?: Callbacks) {
+    if (!this.client) {
+      this.setClientNotExist();
+      return;
     }
-    return this.chains.get(chainName);
+    this.setState(State.Done);
+
+    if (sessionOptions?.duration) {
+      setTimeout(() => {
+        this.disconnect(callbacks);
+      }, sessionOptions?.duration);
+    }
+
+    callbacks?.connect?.();
   }
 
-  disconnect() {
-    this.chains.forEach((chain) => {
+  disconnect(callbacks?: Callbacks) {
+    this.chainWallets?.forEach((chain) => {
       chain.disconnect();
     });
     this.reset();
+    callbacks?.disconnect?.();
   }
-
-  async connect() {
-    if (!(await this.client)) {
-      this.setState(State.Error);
-      this.setMessage('Client Not Exist!');
-      return;
-    }
-    await this.update();
-  }
-
-  abstract setChains(supportedChains?: ChainInfo[]): void;
 }

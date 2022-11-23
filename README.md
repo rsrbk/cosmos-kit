@@ -8,6 +8,9 @@
   <a href="https://github.com/cosmology-tech/cosmos-kit/actions/workflows/run-tests.yml">
     <img height="20" src="https://github.com/cosmology-tech/cosmos-kit/actions/workflows/run-tests.yml/badge.svg" />
   </a>
+  <a href="https://www.npmjs.com/package/@cosmos-kit/core">
+    <img height="20" src="https://img.shields.io/npm/dt/@cosmos-kit/core" />
+  </a>
    <a href="https://github.com/cosmology-tech/cosmos-kit/blob/main/LICENSE"><img height="20" src="https://img.shields.io/badge/license-BSD%203--Clause%20Clear-blue.svg"></a>
    <a href="https://www.npmjs.com/package/@cosmos-kit/core"><img height="20" src="https://img.shields.io/github/package-json/v/cosmology-tech/cosmos-kit?filename=packages%2Fcore%2Fpackage.json"></a>
 </p>
@@ -20,21 +23,29 @@ Get started quickly by using [create-cosmos-app](https://github.com/cosmology-te
 
 ## ⚙️ Configuration
 
-Check out [our docs here](packages/react/README.md) to configure Cosmos Kit.
+Check out [our docs here](https://docs.cosmoskit.com/get-started) to configure Cosmos Kit.
 
 ## ⚛️ CosmJS Signers
 
-If you want to get a cosmjs stargate or cosmwasm signer, [here are docs for our hooks](https://github.com/cosmology-tech/cosmos-kit/blob/main/packages/react/README.md#2-signing-clients)
+If you want to get a cosmjs stargate or cosmwasm signer, [here are docs for our hooks](https://docs.cosmoskit.com/WalletManager/signing-client)
 
 ## 📦 Packages
 
 #### [@cosmos-kit/react](packages/react)
 
-A wallet adapter for react with mobile WalletConnect support for the Cosmos ecosystem.
+A wallet adapter for React with mobile WalletConnect support for the Cosmos ecosystem.
 
 #### [@cosmos-kit/keplr](packages/keplr)
 
-Keplr Wallet integration with Mobile support.
+Keplr Wallet integration.
+
+#### [@cosmos-kit/cosmostation](packages/cosmostation)
+
+Cosmostation Wallet integration.
+
+#### [@cosmos-kit/leap](packages/leap)
+
+Leap Wallet integration.
 
 #### [@cosmos-kit/example](packages/example)
 
@@ -42,7 +53,7 @@ An example Next.js project integrating `@cosmos-kit/react` wallet adapter.
 
 ## 🔌 Integrating Wallets
 
-See our docs on [integrating your wallet](https://github.com/cosmology-tech/cosmos-kit/blob/main/INTEGRATING-WALLETS.md)
+See our docs on [integrating your wallet](https://docs.cosmoskit.com/integrating-wallets)
 
 ## 🛠 Developing
 
